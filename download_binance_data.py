@@ -6,14 +6,14 @@ import subprocess
 import shutil
 from binance_historical_data import BinanceDataDumper
 from datetime import date
+import glob
 
 def download_data():
     """دانلود داده‌های ۱ ساعته و ۱۵ دقیقه‌ای BTCUSDT از ۲۰۱۷ تا امروز"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, "data", "raw")
-    os.makedirs(data_dir, exist_ok=True)
-
-    # حذف فایل‌های قبلی (در صورت وجود) برای جلوگیری از تداخل
+    
+    # حذف پوشه قبلی برای شروع تمیز
     if os.path.exists(data_dir):
         shutil.rmtree(data_dir)
     os.makedirs(data_dir, exist_ok=True)
@@ -68,36 +68,61 @@ def zip_and_split(data_dir, output_zip_base="binance_data", part_size_mb=50):
         print("❌ هیچ فایل CSV یافت نشد!")
         return None
 
-    # همه فایل‌ها را در یک دایرکتوری موقت جمع می‌کنیم (برای جلوگیری از ساختار پوشه‌ها)
-    temp_dir = os.path.join(os.path.dirname(data_dir), "temp_zip")
-    os.makedirs(temp_dir, exist_ok=True)
+    print(f"📁 تعداد فایل‌های CSV پیدا شده: {len(csv_files)}")
+
+    # دایرکتوری موقت برای جمع کردن فایل‌ها (بدون ساختار پوشه)
+    parent_dir = os.path.dirname(data_dir)
+    temp_dir = os.path.join(parent_dir, "temp_zip")
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+    os.makedirs(temp_dir)
+
     for f in csv_files:
         shutil.copy2(f, temp_dir)   # کپی فایل بدون حفظ ساختار زیرپوشه‌ها
 
     # مسیر فایل ZIP نهایی (قبل از اسپلیت)
-    full_zip = os.path.join(os.path.dirname(data_dir), f"{output_zip_base}_full.zip")
-    # ساخت ZIP از همه فایل‌های داخل temp_dir
-    subprocess.run(["zip", "-j", full_zip, temp_dir + "/*"], check=True)
+    full_zip = os.path.join(parent_dir, f"{output_zip_base}_full.zip")
+    
+    # استفاده از لیست فایل‌ها به جای wildcard
+    file_list = glob.glob(os.path.join(temp_dir, "*.csv"))
+    if not file_list:
+        print("❌ هیچ فایل CSV در temp_dir کپی نشد!")
+        shutil.rmtree(temp_dir)
+        return None
+
+    # ساخت ZIP از همه فایل‌ها (با -j برای حذف مسیر)
+    cmd = ["zip", "-j", full_zip] + file_list
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"❌ خطا در ساخت ZIP: {result.stderr}")
+        shutil.rmtree(temp_dir)
+        return None
 
     # حذف دایرکتوری موقت
     shutil.rmtree(temp_dir)
 
-    # تقسیم فایل ZIP به پارت‌های ۵۰ مگابایتی (با استفاده از ابزار zip)
-    # خروجی: f"{output_zip_base}.zip", f"{output_zip_base}.z01", f"{output_zip_base}.z02", ...
-    split_zip_base = os.path.join(os.path.dirname(data_dir), output_zip_base)
-    subprocess.run(["zip", "-s", f"{part_size_mb}m", full_zip, "--out", split_zip_base], check=True)
+    # تقسیم فایل ZIP به پارت‌های ۵۰ مگابایتی
+    split_zip_base = os.path.join(parent_dir, output_zip_base)
+    # ابتدا فایل خروجی قبلی را حذف می‌کنیم (در صورت وجود)
+    for ext in [".zip", ".z01", ".z02", ".z03", ".z04", ".z05"]:
+        fpath = split_zip_base + ext
+        if os.path.exists(fpath):
+            os.remove(fpath)
+
+    cmd_split = ["zip", "-s", f"{part_size_mb}m", full_zip, "--out", split_zip_base]
+    result = subprocess.run(cmd_split, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"❌ خطا در تقسیم ZIP: {result.stderr}")
+        return None
 
     # حذف فایل ZIP کامل
     os.remove(full_zip)
 
-    # حذف پوشه داده اصلی تا فقط فایل‌های ZIP پارت شده در مخزن بمانند (اختیاری)
+    # حذف پوشه داده اصلی برای کاهش حجم (اختیاری)
     shutil.rmtree(data_dir)
 
     # برگرداندن لیست فایل‌های پارت شده
-    part_files = []
-    for f in os.listdir(os.path.dirname(data_dir)):
-        if f.startswith(output_zip_base) and (f.endswith(".zip") or f.endswith(".z01") or f.endswith(".z02") or f.endswith(".z03")):
-            part_files.append(os.path.join(os.path.dirname(data_dir), f))
+    part_files = glob.glob(split_zip_base + ".*")
     return part_files
 
 if __name__ == "__main__":
@@ -106,6 +131,7 @@ if __name__ == "__main__":
     if parts:
         print("🎉 فایل‌های پارت شده ایجاد شدند:")
         for p in parts:
-            print(f"   {p}")
+            print(f"   {p} ({os.path.getsize(p) / (1024*1024):.2f} MB)")
     else:
         print("❌ خطا در ایجاد پارت‌ها")
+        exit(1)
