@@ -24,7 +24,7 @@ jobs:
         run: pip install binance-historical-data pandas
 
       - name: 📥 اجرای اسکریپت دانلود و تقسیم
-        run: python download_and_split.py
+        run: python download_binance_data.py
 
       - name: 📝 کامیت و پوش قطعات
         run: |
