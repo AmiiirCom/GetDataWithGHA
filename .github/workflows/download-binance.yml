@@ -1,9 +1,9 @@
-name: "Download Binance Data & Commit as ZIP Parts"
+name: '📦 دانلود بایننس و ذخیره به صورت قطعات 50 مگابایتی (بدون LFS)'
 
 on:
-  schedule:
-    - cron: "0 0 1 * *"
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *'
 
 permissions:
   contents: write
@@ -12,38 +12,28 @@ jobs:
   download-and-commit:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: 🔄 دریافت کد مخزن
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Python
+      - name: 🐍 نصب پایتون
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install binance-historical-data pandas
+      - name: 📦 نصب وابستگی‌ها
+        run: pip install binance-historical-data pandas
 
-      - name: Run download and split script
-        run: python download_binance_data.py
+      - name: 📥 اجرای اسکریپت دانلود و تقسیم
+        run: python download_and_split.py
 
-      - name: List generated files (برای اشکال‌زدایی)
-        run: |
-          echo "فایل‌های موجود در ریشه:"
-          ls -lah binance_data.part* 2>/dev/null || echo "هیچ پارتی یافت نشد"
-          echo "فایل‌های باقیمانده data/raw:"
-          ls -lah data/raw/ 2>/dev/null || echo "پوشه خالی است"
-
-      - name: Commit and push if there are changes
+      - name: 📝 کامیت و پوش قطعات
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add binance_data.part* 2>/dev/null || true
+          git add binance_data_split.part*
           if git diff --staged --quiet; then
-            echo "No changes to commit."
+            echo "هیچ تغییری وجود ندارد"
           else
-            git commit -m "Auto-update Binance data (split to 50MB parts)"
+            git commit -m "Add Binance data split parts (BTCUSDT 1h+15m) - $(date +%Y-%m-%d)"
             git push origin HEAD:main
           fi
