@@ -2,11 +2,11 @@ name: "Download Binance Data & Commit as ZIP Parts"
 
 on:
   schedule:
-    - cron: "0 0 1 * *"     # هر ماه یک بار (روز اول ماه) - می‌توانید تغییر دهید
-  workflow_dispatch:          # قابلیت اجرای دستی
+    - cron: "0 0 1 * *"
+  workflow_dispatch:
 
 permissions:
-  contents: write             # اجازه push به مخزن
+  contents: write
 
 jobs:
   download-and-commit:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0      # برای دسترسی به تاریخچه کامل (اختیاری)
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,20 +29,21 @@ jobs:
       - name: Run download and split script
         run: python download_binance_data.py
 
-      - name: Configure Git
+      - name: List generated files (برای اشکال‌زدایی)
+        run: |
+          echo "فایل‌های موجود در ریشه:"
+          ls -lah binance_data.part* 2>/dev/null || echo "هیچ پارتی یافت نشد"
+          echo "فایل‌های باقیمانده data/raw:"
+          ls -lah data/raw/ 2>/dev/null || echo "پوشه خالی است"
+
+      - name: Commit and push if there are changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Add and commit ZIP parts
-        run: |
-          # فایل‌های پارت شده را به git اضافه می‌کنیم
-          git add binance_data.z* binance_data.zip 2>/dev/null || true
-          git add data/raw -f 2>/dev/null || true   # در صورت وجود فایل CSV اضافی
-          # اگر تغییری وجود داشت commit کنید
+          git add binance_data.part* 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Auto-update Binance data (splitted to 50MB parts)"
+            git commit -m "Auto-update Binance data (split to 50MB parts)"
             git push origin HEAD:main
           fi
