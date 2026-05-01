@@ -1,19 +1,21 @@
-name: "Download Binance Data"
+name: "Download Binance Data & Commit as ZIP Parts"
 
 on:
   schedule:
-    - cron: "0 0 * * *"        # هر روز ساعت 00:00 UTC
-  workflow_dispatch:             # قابلیت اجرای دستی
+    - cron: "0 0 1 * *"     # هر ماه یک بار (روز اول ماه) - می‌توانید تغییر دهید
+  workflow_dispatch:          # قابلیت اجرای دستی
 
 permissions:
-  contents: read                 # فقط خواندن مخزن (برای آپلود آرتیفکت نیاز به write نیست)
+  contents: write             # اجازه push به مخزن
 
 jobs:
-  download:
+  download-and-commit:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # برای دسترسی به تاریخچه کامل (اختیاری)
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -24,17 +26,23 @@ jobs:
         run: |
           pip install binance-historical-data pandas
 
-      - name: Run download script
+      - name: Run download and split script
         run: python download_binance_data.py
 
-      - name: List all downloaded CSV files (برای اشکال‌زدایی)
+      - name: Configure Git
         run: |
-          echo "فایل‌های CSV پیدا شده:"
-          find data/raw -name "*.csv" -type f
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload artifacts (همه فایل‌های CSV)
-        uses: actions/upload-artifact@v4
-        with:
-          name: binance-csv-data
-          path: data/raw/**/*.csv        # الگوی بازگشتی برای همه CSV‌ها
-          retention-days: 30
+      - name: Add and commit ZIP parts
+        run: |
+          # فایل‌های پارت شده را به git اضافه می‌کنیم
+          git add binance_data.z* binance_data.zip 2>/dev/null || true
+          git add data/raw -f 2>/dev/null || true   # در صورت وجود فایل CSV اضافی
+          # اگر تغییری وجود داشت commit کنید
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Auto-update Binance data (splitted to 50MB parts)"
+            git push origin HEAD:main
+          fi
