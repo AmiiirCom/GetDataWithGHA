@@ -1,4 +1,4 @@
-name: '📦 دانلود بایننس و ذخیره به صورت قطعات 50 مگابایتی (بدون LFS)'
+name: '📦 Download Binance Data'
 
 on:
   workflow_dispatch:
