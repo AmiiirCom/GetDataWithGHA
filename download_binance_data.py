@@ -1,7 +1,7 @@
-# download_data.py
+# download_binance_data.py
 import os
 from binance_historical_data import BinanceDataDumper
-from datetime import datetime
+from datetime import date, datetime   # اضافه کردن date
 
 def setup_and_download():
     # ایجاد پوشه دیتا (مشابه کد قبلی)
@@ -9,41 +9,37 @@ def setup_and_download():
     data_dir = os.path.join(script_dir, "data", "raw")
     os.makedirs(data_dir, exist_ok=True)
 
-    # --- تنظیمات دانلود ---
+    # --- تنظیمات دانلود 1 ساعته ---
     dumper = BinanceDataDumper(
         path_dir_where_to_dump=data_dir,
-        asset_class="spot",                # دانلود از بازار اسپات
-        data_type="klines",                # دانلود کندل‌ها
-        data_frequency="1h"                # تایم فریم 1 ساعته
+        asset_class="spot",
+        data_type="klines",
+        data_frequency="1h"
     )
 
-    # --- شروع دانلود ---
     print("شروع به دانلود کندل‌های 1 ساعته BTCUSDT (از 2017 تا امروز)...")
     dumper.dump_data(
-        tickers=["BTCUSDT"],               # فقط نماد مدنظر
-        date_start=datetime(2017, 1, 1),   # از این تاریخ
-        date_end=datetime.now(),           # تا امروز
+        tickers=["BTCUSDT"],
+        date_start=date(2017, 1, 1),          # ✅ استفاده از date
+        date_end=date.today(),                # ✅ امروز به صورت date
         is_to_update_existing=False
     )
 
-    # --- دانلود تایم فریم 15 دقیقه - توجه: این کار را جداگانه انجام می‌دهد ---
-    print("\nشروع به دانلود کندل‌های 15 دقیقه‌ای...")
-
-    # برای تایم فریم 15 دقیقه، متغیر new_dumper را در پوشه دیگری تعریف کنید
-    # (library فعلاً در یک run نمی‌تواند دو تایم فریم جدا دانلود کند)
-    new_dumper = BinanceDataDumper(
+    # --- دانلود تایم فریم 15 دقیقه ---
+    print("\nشروع به دانلود کندل‌های 15 دقیقه‌ای BTCUSDT...")
+    dumper_15m = BinanceDataDumper(
         path_dir_where_to_dump=data_dir,
         asset_class="spot",
         data_type="klines",
         data_frequency="15m"
     )
-    new_dumper.dump_data(
+    dumper_15m.dump_data(
         tickers=["BTCUSDT"],
-        date_start=datetime(2017, 1, 1),
-        date_end=datetime.now(),
+        date_start=date(2017, 1, 1),
+        date_end=date.today(),
         is_to_update_existing=False
     )
-    
+
     print("\n✅ تمامی دانلودها با موفقیت انجام شد.")
 
 if __name__ == "__main__":
